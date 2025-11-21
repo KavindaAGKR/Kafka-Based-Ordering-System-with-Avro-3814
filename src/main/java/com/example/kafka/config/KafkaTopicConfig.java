@@ -25,6 +25,9 @@ public class KafkaTopicConfig {
     @Value("${kafka.topic.dlq}")
     private String dlqTopic;
 
+    @Value("${kafka.topic.aggregated}")
+    private String aggregatedTopic;
+
     @Bean
     public KafkaAdmin kafkaAdmin() {
         Map<String, Object> configs = new HashMap<>();
@@ -45,5 +48,10 @@ public class KafkaTopicConfig {
     @Bean
     public NewTopic dlqTopic() {
         return new NewTopic(dlqTopic, 3, (short) 1);
+    }
+
+    @Bean
+    public NewTopic aggregatedTopic() {
+        return new NewTopic(aggregatedTopic, 3, (short) 1);
     }
 }

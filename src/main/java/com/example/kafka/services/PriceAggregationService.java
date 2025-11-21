@@ -17,6 +17,7 @@ public class PriceAggregationService {
     @Getter
     private final AtomicReference<Double> runningAverage = new AtomicReference<>(0.0);
 
+
     public void addOrderPrice(float price) {
         int count = orderCount.incrementAndGet();
         double total = totalPrice.updateAndGet(current -> current + price);

@@ -2,6 +2,8 @@ package com.example.kafka.services;
 
 import com.example.kafka.avro.Order;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.kafka.support.Acknowledgment;
 import org.springframework.kafka.support.KafkaHeaders;
@@ -18,6 +20,8 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Service
 public class DLQConsumerService {
 
+    private static final Logger FAILED_ORDER_LOGGER = LoggerFactory.getLogger("FAILED_ORDER_LOGGER");
+
     private final List<FailedOrder> failedOrders = new CopyOnWriteArrayList<>();
 
     @KafkaListener(topics = "${kafka.topic.dlq}", groupId = "dlq-consumer-group")
@@ -26,11 +30,14 @@ public class DLQConsumerService {
             Acknowledgment acknowledgment) {
 
         log.error("DLQ ORDER RECEIVED");
-
         log.error("OrderId: {}", order.getOrderId());
         log.error("Product: {}", order.getProduct());
-        log.error("Price: ${}", order.getPrice());
+        log.error("Price: {}", order.getPrice());
         log.error("Timestamp: {}", LocalDateTime.now());
+
+        String errorReason = order.getPrice() < 0 ? "Invalid price" : "Processing failed after max retries";
+        FAILED_ORDER_LOGGER.info("[DLQ] Failed Topic: order-topic | OrderId: {} | Product: {} | Price: {} | Error: {}",
+                order.getOrderId(), order.getProduct(), order.getPrice(), errorReason);
 
         FailedOrder failedOrder = new FailedOrder(
                 order.getOrderId().toString(),

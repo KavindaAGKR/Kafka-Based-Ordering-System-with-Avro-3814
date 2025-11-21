@@ -28,6 +28,42 @@ public class OrderController {
         this.dlqConsumerService = dlqConsumerService;
     }
 
+    // Send a specific order with JSON payload
+    @PostMapping
+    public ResponseEntity<Map<String, String>> sendOrder(@RequestBody Map<String, Object> orderData) {
+        try {
+            String orderId = (String) orderData.get("orderId");
+            String product = (String) orderData.get("product");
+
+            Object priceObj = orderData.get("price");
+            float price;
+            if (priceObj instanceof Double) {
+                price = ((Double) priceObj).floatValue();
+            } else if (priceObj instanceof Float) {
+                price = (Float) priceObj;
+            } else if (priceObj instanceof Integer) {
+                price = ((Integer) priceObj).floatValue();
+            } else {
+                price = Float.parseFloat(priceObj.toString());
+            }
+
+            producerService.sendSpecificOrder(orderId, product, price);
+
+            Map<String, String> response = new HashMap<>();
+            response.put("message", "Order sent successfully");
+            response.put("orderId", orderId);
+            response.put("product", product);
+            response.put("price", String.valueOf(price));
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "Invalid order data: " + e.getMessage());
+            return ResponseEntity.badRequest().body(error);
+        }
+    }
+
+    // Send a single random order to Kafka
     @PostMapping("/send")
     public ResponseEntity<Map<String, String>> sendSingleOrder() {
         producerService.sendOrder();
@@ -36,6 +72,7 @@ public class OrderController {
         return ResponseEntity.ok(response);
     }
 
+    // Send multiple random orders to Kafka
     @PostMapping("/send-multiple")
     public ResponseEntity<Map<String, String>> sendMultipleOrders(
             @RequestParam(defaultValue = "10") int count) {
@@ -51,6 +88,13 @@ public class OrderController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * Get real-time aggregation statistics
+     * - Total orders processed
+     * - Total price sum
+     * - Running average price
+     * - Failed orders count
+     */
     @GetMapping("/stats")
     public ResponseEntity<Map<String, Object>> getOrderStats() {
         Map<String, Object> stats = new HashMap<>();
@@ -58,10 +102,11 @@ public class OrderController {
         stats.put("totalPrice", String.format("%.2f", priceAggregationService.getTotalPrice()));
         stats.put("runningAverage", String.format("%.2f", priceAggregationService.getRunningAverage().get()));
         stats.put("failedOrders", dlqConsumerService.getFailedOrderCount());
+
         return ResponseEntity.ok(stats);
     }
 
-    
+    // Get all failed orders from DLQ
     @GetMapping("/failed")
     public ResponseEntity<Map<String, Object>> getFailedOrders() {
         List<DLQConsumerService.FailedOrder> failedOrders = dlqConsumerService.getFailedOrders();
@@ -71,6 +116,7 @@ public class OrderController {
         return ResponseEntity.ok(response);
     }
 
+    // Reset all statistics and clear DLQ
     @DeleteMapping("/stats/reset")
     public ResponseEntity<Map<String, String>> resetStats() {
         priceAggregationService.reset();

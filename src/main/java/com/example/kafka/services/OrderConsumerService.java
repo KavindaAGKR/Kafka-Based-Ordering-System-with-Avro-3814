@@ -38,12 +38,16 @@ public class OrderConsumerService {
             log.info("Consumed order: OrderId={}, Product={}, Price=${}",
                     order.getOrderId(), order.getProduct(), order.getPrice());
 
+            if (order.getPrice() < 0) {
+                throw new IllegalArgumentException(
+                        "Invalid price: " + order.getPrice() + " - Price cannot be negative");
+            }
+
             if (random.nextInt(10) == 0) {
                 throw new RuntimeException("Simulated temporary processing failure");
             }
 
             processOrder(order);
-
             acknowledgment.acknowledge();
 
         } catch (Exception e) {
@@ -56,7 +60,6 @@ public class OrderConsumerService {
 
     private void processOrder(Order order) {
         priceAggregationService.addOrderPrice(order.getPrice());
-
         log.info("Order processed successfully: OrderId={}", order.getOrderId());
     }
 

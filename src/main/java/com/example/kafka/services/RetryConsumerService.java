@@ -24,7 +24,6 @@ public class RetryConsumerService {
     private final String dlqTopic;
     private final int maxRetryAttempts;
     private final long backoffMs;
-
     private final Map<String, Integer> retryAttempts = new ConcurrentHashMap<>();
 
     public RetryConsumerService(PriceAggregationService priceAggregationService,
@@ -55,12 +54,11 @@ public class RetryConsumerService {
             Thread.sleep(waitTime);
             log.info("Waited {}ms before retry attempt", waitTime);
 
-            if (Math.random() < 0.5) {
-                throw new RuntimeException("Simulated retry failure");
+            if (order.getPrice() < 0) {
+                throw new RuntimeException("Invalid price: " + order.getPrice() + " - Price cannot be negative");
             }
 
             processOrder(order);
-
             retryAttempts.remove(orderId);
             acknowledgment.acknowledge();
 
@@ -68,7 +66,7 @@ public class RetryConsumerService {
                     orderId, currentAttempt);
 
         } catch (Exception e) {
-                log.error("Retry failed for order: OrderId={}, Attempt={}/{}, Error={}",
+            log.error("Retry failed for order: OrderId={}, Attempt={}/{}, Error={}",
                     orderId, currentAttempt, maxRetryAttempts, e.getMessage());
 
             if (currentAttempt >= maxRetryAttempts) {
@@ -76,7 +74,6 @@ public class RetryConsumerService {
                 retryAttempts.remove(orderId);
                 acknowledgment.acknowledge();
             } else {
-                
                 retryAttempts.put(orderId, currentAttempt);
                 kafkaTemplate.send(retryTopic, orderId, order);
                 acknowledgment.acknowledge();
@@ -90,7 +87,21 @@ public class RetryConsumerService {
     }
 
     private void sendToDLQ(Order order, String reason) {
-        log.error("Sending order to DLQ: OrderId={}, Reason={}", order.getOrderId(), reason);
-        kafkaTemplate.send(dlqTopic, order.getOrderId().toString(), order);
+        log.warn("Max retries exceeded. Sending to DLQ: OrderId={}", order.getOrderId());
+
+        try {
+            kafkaTemplate.send(dlqTopic, order.getOrderId().toString(), order);
+            log.info("Order sent to DLQ: OrderId={}", order.getOrderId());
+
+            org.slf4j.LoggerFactory.getLogger("FAILED_ORDER_LOGGER")
+                    .info("[DLQ] Failed Topic: {} | OrderId: {} | Product: {} | Price: {} | Error: {}",
+                            "order-topic",
+                            order.getOrderId(),
+                            order.getProduct(),
+                            order.getPrice(),
+                            reason);
+        } catch (Exception e) {
+            log.error("Failed to send order to DLQ: OrderId={}, Error: {}", order.getOrderId(), e.getMessage());
+        }
     }
 }

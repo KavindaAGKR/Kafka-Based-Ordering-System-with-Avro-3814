@@ -51,10 +51,22 @@ public class OrderProducerService {
         log.info("Sent {} orders to Kafka topic: {}", count, ordersTopic);
     }
 
+    public void sendSpecificOrder(String orderId, String product, float price) {
+        Order order = Order.newBuilder()
+                .setOrderId(orderId)
+                .setProduct(product)
+                .setPrice(price)
+                .build();
+
+        kafkaTemplate.send(ordersTopic, order.getOrderId().toString(), order);
+        log.info("Sent specific order: OrderId={}, Product={}, Price=${}",
+                order.getOrderId(), order.getProduct(), order.getPrice());
+    }
+
     private Order createRandomOrder() {
         String orderId = UUID.randomUUID().toString();
         String product = products[random.nextInt(products.length)];
-        float price = 10.0f + (random.nextFloat() * 990.0f);
+        float price = 10.0f + (random.nextFloat() * 990.0f); 
 
         return Order.newBuilder()
                 .setOrderId(orderId)
