@@ -63,6 +63,41 @@ Orders flow through the following topics:
 - `orders-retry-topic` - Failed orders for retry
 - `orders-dlq-topic` - Permanently failed orders
 
+## Message Flow Architecture
+
+```
+┌─────────────────┐
+│  Order Producer │
+└────────┬────────┘
+         │
+         ▼
+  [orders-topic]
+         │
+         ▼
+┌─────────────────────┐
+│  Order Consumer     │ ──► [Price Aggregation]
+└────────┬────────────┘
+         │
+         │ (order fails)
+         ▼
+  [orders-retry-topic]
+         │
+         ▼
+┌─────────────────────┐
+│  Retry Consumer     │
+│  (Max 3 attempts)   │
+└────────┬────────────┘
+         │
+         │ (Max retries)
+         ▼
+  [orders-dlq-topic]
+         │
+         ▼
+┌─────────────────────┐
+│  DLQ Consumer       │ ──► [Log & Store]
+└─────────────────────┘
+```
+
 
 ## API Endpoints
 
